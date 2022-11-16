@@ -1,0 +1,45 @@
+dbms.security.procedures.whitelist=apoc.coll.*,apoc.load.*
+dbms.security.procedures.unrestricted=apoc.*
+
+dbms.security.procedures.unrestricted=jwt.security.*,apoc.*,gds.*
+dbms.security.procedures.allowlist=apoc.*,gds.*
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/lawrencerowland/enterprise_view_archi/main/archi/elements.csv' AS line
+CREATE (:elements {class:line.Type, name:line.Name,
+documentation:line.Documentation,
+ id:line.ID })
+
+
+LOAD CSV WITH HEADERS FROM 'https://raw.githubusercontent.com/lawrencerowland/enterprise_view_archi/main/archi/relations.csv' AS line
+MATCH (n {id:line.Source})
+WITH n, line
+MATCH (m {id:line.Target})
+WITH n, m, line
+CREATE (n)-[:relationships {id:line.ID, class:line.Type,
+documentation:line.Documentation,name:line.Name}]->(m)
+
+
+MATCH (n:elements)
+CALL apoc.create.addLabels(n, [ n.class ])
+YIELD node
+RETURN node
+
+MATCH (n:elements)-[R:relationships]->(m:elements)
+CALL apoc.create.relationship(n, R.class,{}, m )
+YIELD rel
+DELETE R
+
+MATCH (n)
+WHERE NOT (n)--()
+RETURN n.name, n.class
+
+MATCH (n)
+WHERE (n:ApplicationComponent OR n:ApplicationService OR
+n:ApplicationFunction)
+AND NOT (n)<-[]-()
+RETURN n.name, n.class
+
+CALL gds.graph.create(
+'myGraph',
+'elements',
+'relationships')
